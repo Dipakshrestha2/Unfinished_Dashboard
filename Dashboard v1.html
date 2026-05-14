@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic DailyStatistics Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        primary: '#6366f1',
+                        secondary: '#ec4899',
+                        darkBg: '#0f172a',
+                        darkCard: '#1e293b'
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-radius: 1rem;
+        }
+
+        .dark .glass-card {
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #6366f1, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #6366f1;
+            border: 1px solid #6366f1;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .dark .btn-secondary {
+            color: #818cf8;
+            border-color: #818cf8;
+        }
+
+        .btn-secondary:hover {
+            background: #6366f1;
+            color: white;
+            border-color: #6366f1;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        .pie-container {
+            position: relative;
+            height: 220px;
+            width: 100%;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .upload-zone {
+            border: 2px dashed #6366f1;
+            border-radius: 1rem;
+            padding: 2.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-zone:hover,
+        .upload-zone.dragover {
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .dark .upload-zone:hover,
+        .dark .upload-zone.dragover {
+            background: rgba(99, 102, 241, 0.1);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-gray-50 text-gray-800 dark:bg-darkBg dark:text-gray-100 antialiased min-h-screen transition-colors duration-300">
+    <!-- Header -->
+    <header
+        class="sticky top-0 z-50 glass-card rounded-none border-b border-gray-200 dark:border-gray-800 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-4">
+                    <div
+                        class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shrink-0">
+                        <i data-feather="activity" class="text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl md:text-2xl font-bold gradient-text">Dynamic DailyStatistics Dashboard</h1>
+                        <p class="text-xs md:text-sm text-gray-500 dark:text-gray-400" id="headerSubtitle">Real-time
+                            Analytics & Activity</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center justify-center gap-3">
+                    <button onclick="toggleDarkMode()"
+                        class="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        title="Toggle Theme">
+                        <i data-feather="moon" id="themeIcon" class="w-5 h-5 text-gray-600 dark:text-gray-300"></i>
+                    </button>
+                    <button onclick="openUploadModal()" class="btn-primary flex items-center gap-2 text-sm">
+                        <i data-feather="upload" class="w-4 h-4"></i> Import Excel
+                    </button>
+                    <button onclick="exportData()" class="btn-secondary flex items-center gap-2 text-sm">
+                        <i data-feather="download" class="w-4 h-4"></i> Export
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Status Bar -->
+        <div
+            class="flex flex-col sm:flex-row justify-between items-center mb-8 bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
+            <div class="text-sm text-indigo-800 dark:text-indigo-200 flex items-center gap-2">
+                <i data-feather="calendar" class="w-4 h-4"></i>
+                <span class="font-semibold">Report Period:</span> <span id="reportDate">Loading...</span>
+            </div>
+            <div class="text-sm text-indigo-800 dark:text-indigo-200 flex items-center gap-2 mt-2 sm:mt-0">
+                <i data-feather="clock" class="w-4 h-4"></i>
+                <span class="font-semibold">Last Sync:</span> <span id="lastUpdated">Just now</span>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="glass-card p-6 relative overflow-hidden group">
+                <div
+                    class="absolute right-0 top-0 w-24 h-24 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-bl-full -z-10 transition-transform group-hover:scale-110">
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">OIT Training</p>
+                    <div class="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg"><i data-feather="users"
+                            class="w-5 h-5 text-indigo-600 dark:text-indigo-400"></i></div>
+                </div>
+                <p class="text-3xl font-bold text-gray-900 dark:text-white" id="oitTraining">0</p>
+                <div class="mt-2 flex items-center text-sm text-green-500">
+                    <i data-feather="trending-up" class="w-4 h-4 mr-1"></i> <span id="oitTrend">+0%</span>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 relative overflow-hidden group">
+                <div
+                    class="absolute right-0 top-0 w-24 h-24 bg-gradient-to-br from-pink-500/20 to-rose-500/20 rounded-bl-full -z-10 transition-transform group-hover:scale-110">
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">OJT Training</p>
+                    <div class="p-2 bg-pink-100 dark:bg-pink-900/50 rounded-lg"><i data-feather="book-open"
+                            class="w-5 h-5 text-pink-600 dark:text-pink-400"></i></div>
+                </div>
+                <p class="text-3xl font-bold text-gray-900 dark:text-white" id="ojtTraining">0</p>
+                <div class="mt-2 flex items-center text-sm text-green-500">
+                    <i data-feather="trending-up" class="w-4 h-4 mr-1"></i> <span id="ojtTrend">+0%</span>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 relative overflow-hidden group">
+                <div
+                    class="absolute right-0 top-0 w-24 h-24 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-bl-full -z-10 transition-transform group-hover:scale-110">
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Staffing BU Overall</p>
+                    <div class="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg"><i data-feather="pie-chart"
+                            class="w-5 h-5 text-blue-600 dark:text-blue-400"></i></div>
+                </div>
+                <p class="text-3xl font-bold text-gray-900 dark:text-white" id="staffingOverall">0</p>
+                <div class="mt-2 flex items-center text-sm text-red-500">
+                    <i data-feather="trending-down" class="w-4 h-4 mr-1"></i> <span id="staffingTrend">-0%</span>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 relative overflow-hidden group">
+                <div
+                    class="absolute right-0 top-0 w-24 h-24 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-bl-full -z-10 transition-transform group-hover:scale-110">
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Buffer Category</p>
+                    <div class="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg"><i data-feather="layers"
+                            class="w-5 h-5 text-amber-600 dark:text-amber-400"></i></div>
+                </div>
+                <p class="text-3xl font-bold text-gray-900 dark:text-white" id="bufferCategory">0</p>
+                <div class="mt-2 flex items-center text-sm text-green-500">
+                    <i data-feather="trending-up" class="w-4 h-4 mr-1"></i> <span id="bufferTrend">+0%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pie Charts Row -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="glass-card p-5">
+                <h3 class="text-sm font-semibold mb-4 text-gray-800 dark:text-gray-200">OYC Training</h3>
+                <div class="pie-container"><canvas id="oycTrainingChart"></canvas></div>
+            </div>
+            <div class="glass-card p-5">
+                <h3 class="text-sm font-semibold mb-4 text-gray-800 dark:text-gray-200">OJT Training</h3>
+                <div class="pie-container"><canvas id="ojtTrainingChart"></canvas></div>
+            </div>
+            <div class="glass-card p-5">
+                <h3 class="text-sm font-semibold mb-4 text-gray-800 dark:text-gray-200">Staffing BU Overall</h3>
+                <div class="pie-container"><canvas id="staffingOverallChart"></canvas></div>
+            </div>
+            <div class="glass-card p-5">
+                <h3 class="text-sm font-semibold mb-4 text-gray-800 dark:text-gray-200">Buffer Standby</h3>
+                <div class="pie-container"><canvas id="bufferCategoryChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Bar Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div class="glass-card p-5">
+                <h3 class="text-sm font-semibold mb-4 text-gray-800 dark:text-gray-200">Top Standby Role</h3>
+                <div class="chart-container"><canvas id="standbyRoleChart"></canvas></div>
+            </div>
+            <div class="glass-card p-5">
+                <h3 class="text-sm font-semibold mb-4 text-gray-800 dark:text-gray-200">Top Buffer Category</h3>
+                <div class="chart-container"><canvas id="topBufferChart"></canvas></div>
+            </div>
+            <div class="glass-card p-5">
+                <h3 class="text-sm font-semibold mb-4 text-gray-800 dark:text-gray-200">Other Categories</h3>
+                <div class="chart-container"><canvas id="otherCategoryChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Trend Line Charts -->
+        <div class="grid grid-cols-1 gap-6 mb-8">
+            <div class="glass-card p-6">
+                <h3 class="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Statistics Trend Report</h3>
+                <div class="chart-container" style="height: 350px;"><canvas id="trendChart"></canvas></div>
+            </div>
+            <div class="glass-card p-6">
+                <h3 class="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Daily Standby-Buffer Total
+                </h3>
+                <div class="chart-container" style="height: 350px;"><canvas id="dailyStaticsChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="glass-card p-6 mb-8">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Detailed Data Records</h3>
+                <button onclick="openUploadModal()" class="btn-primary text-sm flex items-center gap-2">
+                    <i data-feather="upload" class="w-4 h-4"></i> Import Excel
+                </button>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                <table class="w-full text-left text-sm text-gray-600 dark:text-gray-300">
+                    <thead
+                        class="bg-gray-50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold">Date</th>
+                            <th class="px-4 py-3 font-semibold">DPWA Group</th>
+                            <th class="px-4 py-3 font-semibold">Standby</th>
+                            <th class="px-4 py-3 font-semibold">Buffer</th>
+                            <th class="px-4 py-3 font-semibold">Logistics</th>
+                            <th class="px-4 py-3 font-semibold">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-gray-200 dark:divide-gray-700">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal"
+        class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/50 backdrop-blur-sm p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white dark:bg-darkCard rounded-2xl p-6 md:p-8 max-w-lg w-full shadow-2xl transform scale-95 transition-transform duration-300"
+            id="modalContent">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold dark:text-white">Import Excel Data</h2>
+                <button onclick="closeUploadModal()"
+                    class="text-gray-500 hover:text-gray-800 dark:hover:text-white transition-colors">
+                    <i data-feather="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="upload-zone border-dashed border-2 border-indigo-400 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20"
+                id="uploadZone" ondrop="handleDrop(event)" ondragover="handleDragOver(event)"
+                ondragleave="handleDragLeave(event)">
+                <i data-feather="upload-cloud" class="w-12 h-12 mx-auto mb-4 text-indigo-500"></i>
+                <p class="text-base font-semibold mb-1 dark:text-gray-200">Drag & drop your Excel file</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">or click to browse from your computer</p>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden" onchange="handleFileSelect(event)">
+                <button onclick="document.getElementById('fileInput').click()" class="btn-primary w-full sm:w-auto">
+                    Choose File
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dark Mode Logic
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            document.getElementById('themeIcon').setAttribute('data-feather', isDark ? 'sun' : 'moon');
+            feather.replace();
+            updateChartTheme();
+        }
+
+        // Initialize Theme
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+
+        // Global variables
+        let dashboardData = { dates: [], dpwaGroups: [], standbyData: [], bufferData: [], logisticsData: [], totals: [] };
+        let charts = {};
+
+        // Initial Dummy Data (before upload)
+        function loadInitialData() {
+            dashboardData = {
+                dates: ['No Data'],
+                dpwaGroups: [0],
+                standbyData: [0],
+                bufferData: [0],
+                logisticsData: [0],
+                totals: [0]
+            };
+            document.getElementById('reportDate').textContent = 'Please import an Excel file';
+            updateDashboard();
+            populateTable();
+            initOrUpdateCharts();
+        }
+
+        // Excel Upload Logic
+        function openUploadModal() {
+            const modal = document.getElementById('uploadModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                document.getElementById('modalContent').classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeUploadModal() {
+            const modal = document.getElementById('uploadModal');
+            modal.classList.add('opacity-0');
+            document.getElementById('modalContent').classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('bg-indigo-100'); }
+        function handleDragLeave(e) { e.currentTarget.classList.remove('bg-indigo-100'); }
+        function handleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('bg-indigo-100');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                document.getElementById('fileInput').files = e.dataTransfer.files;
+                processFile(e.dataTransfer.files[0]);
+            }
+        }
+
+        function handleFileSelect(event) {
+            if (event.target.files && event.target.files.length > 0) {
+                processFile(event.target.files[0]);
+            }
+        }
+
+        function processFile(file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+                    const rows = jsonData.slice(1); // skip header
+                    dashboardData = { dates: [], dpwaGroups: [], standbyData: [], bufferData: [], logisticsData: [], totals: [] };
+
+                    rows.forEach(row => {
+                        if (row[0] !== undefined && row[0] !== null) { // Check if date exists
+                            let dateStr = row[0];
+                            // Check if the date is an Excel serial number
+                            if (!isNaN(dateStr) && typeof dateStr !== 'boolean' && String(dateStr).trim() !== '') {
+                                const serial = parseFloat(dateStr);
+                                if (serial > 10000 && serial < 80000) {
+                                    const utc_days = Math.floor(serial - 25569);
+                                    const date_info = new Date(utc_days * 86400 * 1000);
+                                    // Use format like 14 Oct 2024
+                                    dateStr = date_info.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                                }
+                            }
+                            dashboardData.dates.push(dateStr);
+                            dashboardData.dpwaGroups.push(parseInt(row[1]) || 0);
+                            dashboardData.standbyData.push(parseInt(row[2]) || 0);
+                            dashboardData.bufferData.push(parseInt(row[3]) || 0);
+                            dashboardData.logisticsData.push(parseInt(row[4]) || 0);
+                            dashboardData.totals.push(parseInt(row[5]) || 0);
+                        }
+                    });
+
+                    if (dashboardData.dates.length > 0) {
+                        document.getElementById('reportDate').textContent = `${dashboardData.dates[0]} to ${dashboardData.dates[dashboardData.dates.length - 1]}`;
+                    }
+
+                    updateDashboard();
+                    populateTable();
+                    initOrUpdateCharts();
+                    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+                    closeUploadModal();
+                    alert('Data imported successfully!');
+                } catch (error) {
+                    alert('Error importing file: ' + error.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Init/Update Dashboard Elements
+        function updateDashboard() {
+            const lastIndex = Math.max(0, dashboardData.totals.length - 1);
+
+            // Use Actual Values
+            animateValue("oitTraining", dashboardData.dpwaGroups[lastIndex] || 0);
+            animateValue("ojtTraining", dashboardData.standbyData[lastIndex] || 0);
+            animateValue("staffingOverall", dashboardData.bufferData[lastIndex] || 0);
+            animateValue("bufferCategory", dashboardData.totals[lastIndex] || 0);
+
+            // Calculate trends for display
+            const calculateTrend = (dataArray) => {
+                if (!dataArray || dataArray.length < 2) return { val: 0, isPos: true };
+                const current = dataArray[lastIndex];
+                const prev = dataArray[lastIndex - 1];
+                if (prev === 0) return { val: 0, isPos: true };
+                const percent = Math.round(((current - prev) / prev) * 100);
+                return { val: Math.abs(percent), isPos: percent >= 0 };
+            };
+
+            const metrics = [dashboardData.dpwaGroups, dashboardData.standbyData, dashboardData.bufferData, dashboardData.totals];
+            const trendIds = ["oitTrend", "ojtTrend", "staffingTrend", "bufferTrend"];
+
+            trendIds.forEach((id, index) => {
+                const trendData = calculateTrend(metrics[index] || []);
+                const el = document.getElementById(id);
+                el.textContent = `${trendData.isPos ? '+' : '-'}${trendData.val}%`;
+                el.className = trendData.isPos ? 'text-green-500' : 'text-red-500';
+                el.previousElementSibling.setAttribute('data-feather', trendData.isPos ? 'trending-up' : 'trending-down');
+            });
+            feather.replace();
+        }
+
+        function animateValue(id, end) {
+            const obj = document.getElementById(id);
+            let start = parseInt(obj.textContent) || 0;
+            const duration = 1000;
+            const range = end - start;
+            let startTime = null;
+
+            function step(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const progress = Math.min((timestamp - startTime) / duration, 1);
+                obj.textContent = Math.floor(progress * range + start);
+                if (progress < 1) window.requestAnimationFrame(step);
+            }
+            window.requestAnimationFrame(step);
+        }
+
+        // Chart Initialization and Update
+        function getChartColors() {
+            const isDark = document.documentElement.classList.contains('dark');
+            return {
+                text: isDark ? '#e2e8f0' : '#475569',
+                grid: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                colors1: ['#6366f1', '#ec4899', '#8b5cf6', '#14b8a6', '#f59e0b'],
+                colors2: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+            };
+        }
+
+        function initOrUpdateCharts() {
+            const theme = getChartColors();
+            Chart.defaults.color = theme.text;
+            Chart.defaults.font.family = 'Inter';
+
+            const pieOptions = {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { color: theme.text, padding: 20, usePointStyle: true } } }
+            };
+
+            const barOptions = {
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: theme.grid }, ticks: { color: theme.text } },
+                    y: { grid: { display: false }, ticks: { color: theme.text } }
+                }
+            };
+
+            // Helpers for pie/bar data
+            const makePie = (id, labels, colors, baseValues) => {
+                const total = dashboardData.totals.reduce((a, b) => a + b, 0) || 100;
+                const data = baseValues.map(v => Math.round((v / 100) * total));
+                if (charts[id]) charts[id].destroy();
+                charts[id] = new Chart(document.getElementById(id), {
+                    type: 'doughnut', data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+                    options: { ...pieOptions, cutout: '70%' }
+                });
+            };
+
+            const makeBar = (id, labels, baseValues) => {
+                const total = dashboardData.totals.reduce((a, b) => a + b, 0) || 100;
+                const data = baseValues.map(v => Math.round((v / 100) * total));
+                if (charts[id]) charts[id].destroy();
+                charts[id] = new Chart(document.getElementById(id), {
+                    type: 'bar',
+                    data: { labels, datasets: [{ data, backgroundColor: theme.colors1[0], borderRadius: 4 }] },
+                    options: barOptions
+                });
+            };
+
+            makePie('oycTrainingChart', ['DTW & Study', 'Aviation', 'Logistic'], theme.colors1, [50, 30, 20]);
+            makePie('ojtTrainingChart', ['DTW & Study', 'Aviation', 'Logistic'], theme.colors2, [45, 35, 20]);
+            makePie('staffingOverallChart', ['Security', 'Finance', 'Aux Series'], ['#ef4444', '#f97316', '#eab308'], [60, 25, 15]);
+            makePie('bufferCategoryChart', ['Initial', 'DPWA', 'Aviation'], ['#0f766e', '#f97316', '#eab308'], [70, 20, 10]);
+
+            makeBar('standbyRoleChart', ['LOGISTICS', 'FRDPR', 'CARGO', 'STEVEDORE', 'ITU OPER'], [35, 25, 20, 15, 5]);
+            makeBar('topBufferChart', ['LOG PR', 'WHS/CTR', 'FRTF TG', 'PO&S AM', 'SG STSAOG'], [40, 30, 15, 10, 5]);
+            makeBar('otherCategoryChart', ['WAREHOUSE', 'Pilot', 'SSA Agents', 'HR Incident', 'Admin'], [50, 20, 15, 10, 5]);
+
+            // Trend Chart
+            if (charts.trendChart) charts.trendChart.destroy();
+            charts.trendChart = new Chart(document.getElementById('trendChart'), {
+                type: 'line',
+                data: {
+                    labels: dashboardData.dates,
+                    datasets: [
+                        { label: 'DPWA Trend', data: dashboardData.dpwaGroups, borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', tension: 0.4, fill: true },
+                        { label: 'Standby Trend', data: dashboardData.standbyData, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.4, fill: true }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { color: theme.text } } },
+                    scales: {
+                        x: { grid: { color: theme.grid }, ticks: { color: theme.text } },
+                        y: { grid: { color: theme.grid }, ticks: { color: theme.text } }
+                    }
+                }
+            });
+
+            // Stacked Bar Chart
+            if (charts.dailyStaticsChart) charts.dailyStaticsChart.destroy();
+            charts.dailyStaticsChart = new Chart(document.getElementById('dailyStaticsChart'), {
+                type: 'bar',
+                data: {
+                    labels: dashboardData.dates,
+                    datasets: [
+                        { label: 'DPWA', data: dashboardData.dpwaGroups, backgroundColor: '#f97316', stack: 'Stack 0' },
+                        { label: 'Standby', data: dashboardData.standbyData, backgroundColor: '#3b82f6', stack: 'Stack 0' },
+                        { label: 'Buffer', data: dashboardData.bufferData, backgroundColor: '#10b981', stack: 'Stack 0' },
+                        { label: 'Total', data: dashboardData.totals, type: 'line', borderColor: theme.text, backgroundColor: 'transparent', borderWidth: 2, tension: 0.3 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { color: theme.text } } },
+                    scales: {
+                        x: { stacked: true, grid: { display: false }, ticks: { color: theme.text } },
+                        y: { stacked: true, grid: { color: theme.grid }, ticks: { color: theme.text } }
+                    }
+                }
+            });
+        }
+
+        function updateChartTheme() {
+            initOrUpdateCharts();
+        }
+
+        // Table logic
+        function populateTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            dashboardData.dates.forEach((date, i) => {
+                tbody.insertAdjacentHTML('beforeend', `
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                        <td class="px-4 py-3 whitespace-nowrap text-red-600 dark:text-red-400 font-semibold">${date}</td>
+                        <td class="px-4 py-3">${dashboardData.dpwaGroups[i]}</td>
+                        <td class="px-4 py-3">${dashboardData.standbyData[i]}</td>
+                        <td class="px-4 py-3">${dashboardData.bufferData[i]}</td>
+                        <td class="px-4 py-3">${dashboardData.logisticsData[i]}</td>
+                        <td class="px-4 py-3 font-semibold text-indigo-600 dark:text-indigo-400">${dashboardData.totals[i]}</td>
+                    </tr>
+                `);
+            });
+            feather.replace();
+        }
+
+        // Export Data
+        function exportData() {
+            const worksheet = XLSX.utils.aoa_to_sheet([
+                ['Date', 'DPWA Group', 'Standby', 'Buffer', 'Logistics', 'Total'],
+                ...dashboardData.dates.map((date, i) => [
+                    date,
+                    dashboardData.dpwaGroups[i],
+                    dashboardData.standbyData[i],
+                    dashboardData.bufferData[i],
+                    dashboardData.logisticsData[i],
+                    dashboardData.totals[i]
+                ])
+            ]);
+
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Dashboard Data');
+
+            const fileName = `Staffing_Dashboard_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
+            alert('Data exported successfully!');
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            const isDark = document.documentElement.classList.contains('dark');
+            document.getElementById('themeIcon').setAttribute('data-feather', isDark ? 'sun' : 'moon');
+            feather.replace();
+            loadInitialData();
+        });
+    </script>
+</body>
+
+</html>
